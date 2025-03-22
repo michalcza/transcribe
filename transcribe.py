@@ -202,28 +202,11 @@ def transcribe_audio(file_path, language=None, model_size="medium", enable_diari
                 num_speakers=args.speakers,
                 return_plot_data=True
             )
-            plot_path = Path(file_path).with_suffix(".png")
+            plot_path = Path("plots") / Path(file_path).stem
+            plot_path = plot_path.with_suffix(".png")
             plot_embeddings(embeds, labels, out_path=plot_path, show=False)
 
 
-
-
-
-
-
-
-        # if args.plot:
-            # diarized_segments, embeds, labels = diarize_with_resemblyzer(
-                # wav_file,
-                # num_speakers=args.speakers,
-                # return_plot_data=True
-            # )
-            # plot_embeddings(embeds, labels)
-            # plot_path = Path(file_path).with_suffix(".png")
-            
-            
-            
-            #plot_embeddings(embeds, labels, out_path=plot_path, show=False)
         else:
             diarized_segments = diarize_with_resemblyzer(
                 wav_file,
@@ -285,15 +268,6 @@ def transcribe_audio(file_path, language=None, model_size="medium", enable_diari
         print(f"📄 Saved transcript JSON to: {output_json}")
     except Exception as e:
         print(f"\n❌ Error writing transcript to JSON: {e}")
-
-    # # Optionally: save a second JSON version with custom `_pl` suffix
-    # json_path_pl = base_output_path.with_name(base_output_path.name + "_pl").with_suffix(".json")
-    # try:
-        # with open(json_path_pl, "w", encoding="utf-8") as jf:
-            # json.dump(final_segments, jf, indent=2)
-        # print(f"📄 Saved alternate JSON to: {json_path_pl}")
-    # except Exception as e:
-        # print(f"\n❌ Error writing alternate JSON to: {e}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Transcribe audio with optional speaker separation and system monitoring.")

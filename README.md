@@ -15,19 +15,24 @@ A Python-based command-line tool that:
 - Supports `.wav`, `.m4a`, `.mp3`, and more  
 - Configurable language and model size  
 - Optional speaker count override
+- Optional Speaker Embedding Clustering via PCA and plotting.
 
 ### Files
 
 /-----------------------|------------------------------------------------------\
 | File                  | Description                                          |
 |-----------------------|------------------------------------------------------|
+|.\audio\               | Folder for audio input files (and output)            |
+|.\plots\               | Folder for PCA plotting output graphs                |
+|.\.env                 | Private keys and variables (excluded)                |
+|.\.env.example         | Private keys and variables example file              |
+|.\diarization_utils.py | Imported by .\transcribe.py                          |
+|.\gpu-test.py          | Standalone used to test for GPU and configuration.   |
+|.\plot_test.py         | PCA plotting test.                                   |
+|.\README.md            | This file                                            |
 |.\requirements.txt     | List of prerequisites.                               |
 |.\transcribe.py        | Main applicaiton.                                    |
 |.\transcribe-simple.py | Simplified application without diarization.          |
-|.\diarization_utils.py | Loaded by .\transcribe.py                            |
-|.\.env                 | Private keys and variables                           |
-|.\gpu-test.py          | Standalone used to test for GPU and configuration.   |
-|.\README.md            | This file                                            |
 \-----------------------|------------------------------------------------------/
 
 ## Installation
@@ -64,25 +69,56 @@ python transcribe_refactored.py --file path/to/audio.m4a --model medium --langua
 | `--diarization`| Enable speaker separation                        | off      |
 | `--speakers`   | Estimated number of speakers (for KMeans)        | optional |
 | `--no-monitor` | Disable CPU/RAM/GPU system monitoring            | enabled  |
+| `--plot`       | Enable PCA speaker visualization                 | off      |
 \----------------|--------------------------------------------------|----------/
 
 ## Output
+
+### Text File
+Files are appended with forced language.
+```audio_pl.txt```
+```audio_pl.json```
+If no forced language selection, output files equal input file.
+```audio.txt``` 
+
 Transcripts are saved as .txt files in the same directory as your audio, with optional diarization info:
 ```
 [00:00:00 - 00:00:05] Hello, welcome to the meeting.
-[00:00:05 - 00:00:12] Speaker 1: Speech detected
+[00:00:05 - 00:00:12] Speaker 0: Speech detected.
+...
+Diarization Results:
+[00:00:00 - 00:15:01] Speaker 0: Speech detected
+```
+### JSON
+Transcripts are saved as .json files in the same directory as your audio, with optional diarization info:
+```
+[
+  {
+    "start": 0.0,
+    "end": 4.1,
+    "speaker": "Speaker 0",
+    "text": "Nie jest Wizard no\u3067\u3059\u306d returns."
+  },
+]
 ```
 
-## Output
-- openai-whisper
-- resemblyzer
-- pydub
-- torch
-- scikit-learn
-- psutil
-- GPUtil
-- tqdm
-- argparse
+##Speaker Embedding Clustering via PCA
+This plot shows voice embeddings projected into 2D. Each point is a speech segment, colored by assigned speaker. PCA1 and PCA2 are principal components capturing the dominant variance in speaker identity. Clear separation indicates confident diarization.
+Plot file written to `./plots/` folder and same root name as output file `audio_pl.png`.
+
+## Dependencies
+-openai-whisper
+-resemblyzer
+-pydub
+-torch
+-torchaudio
+-scikit-learn
+-psutil
+-GPUtil
+-tqdm
+-matplotlib
+-requests
+-python-dotenv
 
 Install with:
 ```
@@ -96,7 +132,6 @@ pip install -r requirements.txt
 
 ## To Do
 - Merge speaker labels into Whisper transcript
-- Export .srt / .vtt subtitle files
 - Use DBSCAN or BIC for automatic speaker count
 - Visualize speaker clusters (PCA, t-SNE)
 - Streamlit web interface
