@@ -19,7 +19,6 @@ A Python-based command-line tool that:
 
 ### Files
 
-/-----------------------|------------------------------------------------------\
 | File                  | Description                                          |
 |-----------------------|------------------------------------------------------|
 |.\audio\               | Folder for audio input files (and output)            |
@@ -33,7 +32,6 @@ A Python-based command-line tool that:
 |.\requirements.txt     | List of prerequisites.                               |
 |.\transcribe.py        | Main applicaiton.                                    |
 |.\transcribe-simple.py | Simplified application without diarization.          |
-\-----------------------|------------------------------------------------------/
 
 ## Installation
 
@@ -56,11 +54,10 @@ pip install -r requirements.txt
 
 ## Usage
 ```
-python transcribe_refactored.py --file path/to/audio.m4a --model medium --language en --diarization --speakers 2
+python transcribe_refactored.py --file path/to/audio.m4a --model medium --language en --diarization --speakers 2 --plot
 ```
 
 ### CLI Options
-/----------------|--------------------------------------------------|----------\
 | Argument       | Description                                      | Default  |
 |----------------|--------------------------------------------------|----------|
 | `--file`       | Path to audio file                               | required |
@@ -70,7 +67,6 @@ python transcribe_refactored.py --file path/to/audio.m4a --model medium --langua
 | `--speakers`   | Estimated number of speakers (for KMeans)        | optional |
 | `--no-monitor` | Disable CPU/RAM/GPU system monitoring            | enabled  |
 | `--plot`       | Enable PCA speaker visualization                 | off      |
-\----------------|--------------------------------------------------|----------/
 
 ## Output
 
@@ -102,7 +98,7 @@ Transcripts are saved as .json files in the same directory as your audio, with o
 ]
 ```
 
-##Speaker Embedding Clustering via PCA
+## Speaker Embedding Clustering via PCA
 This plot shows voice embeddings projected into 2D. Each point is a speech segment, colored by assigned speaker. PCA1 and PCA2 are principal components capturing the dominant variance in speaker identity. Clear separation indicates confident diarization.
 Plot file written to `./plots/` folder and same root name as output file `audio_pl.png`.
 

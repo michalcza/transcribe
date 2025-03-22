@@ -164,3 +164,9 @@ cython_debug/
 # keep /audio/ but nothing else inside
 /audio/**
 !.gitkeep
+
+# Ignore everything in /plots
+/plots/*
+
+# Except this specific file
+!/plots/speaker_test.png
