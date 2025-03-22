@@ -1,11 +1,14 @@
-from resemblyzer import preprocess_wav, VoiceEncoder
 import numpy as np
-from sklearn.cluster import KMeans
 import os
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from resemblyzer import preprocess_wav, VoiceEncoder
+from pathlib import Path
 
-def diarize_with_resemblyzer(audio_path, num_speakers=None):
+def diarize_with_resemblyzer(audio_path, num_speakers=None, return_plot_data=False):
+
     print(f"🔹 Running speaker diarization using Resemblyzer on {os.path.basename(audio_path)}.")
-
 
     wav = preprocess_wav(audio_path)
     encoder = VoiceEncoder()
@@ -41,5 +44,48 @@ def diarize_with_resemblyzer(audio_path, num_speakers=None):
         labels = kmeans.labels_
 
     segments = [(start, end, label) for (start, end), label in zip(timestamps, labels)]
-    return segments
+    
+    if return_plot_data:
+        return segments, embeds, labels
+    else:
+        return segments
+
+def plot_embeddings(embeds, labels, out_path=None, title="Speaker Clustering (PCA)", show=False):
+    embeds = np.array(embeds)
+    labels = np.array(labels)
+
+    # Fake a second point if there's only one
+    if len(embeds) < 2:
+        print("⚠️ Only one embedding found — injecting dummy point for visualization.")
+        embeds = np.vstack([embeds, embeds[0] + 1e-6])  # add tiny offset
+        labels = np.append(labels, labels[0])  # reuse label
+
+    # Reduce to 2D using PCA
+    pca = PCA(n_components=2)
+    reduced = pca.fit_transform(embeds)
+
+    # Plot
+    plt.figure(figsize=(8, 6))
+    scatter = plt.scatter(
+        reduced[:, 0], reduced[:, 1],
+        c=labels,
+        cmap="tab10", s=40
+    )
+    plt.title(title)
+    plt.xlabel("PCA 1")
+    plt.ylabel("PCA 2")
+    plt.grid(True)
+    plt.colorbar(scatter, ticks=range(max(labels) + 1), label="Speaker")
+    plt.tight_layout()
+
+    if out_path:
+        out_path = Path(out_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(out_path)
+        print(f"📊 Saved speaker embedding plot to: {out_path}")
+
+    if show:
+        plt.show()
+
+plt.close()
 

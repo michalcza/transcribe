@@ -7,7 +7,9 @@ from io import BytesIO
 from resemblyzer import VoiceEncoder, preprocess_wav
 from scipy.spatial.distance import cdist
 from scipy.cluster.hierarchy import fcluster, linkage
-from diarization_utils import diarize_with_resemblyzer
+from diarization_utils import diarize_with_resemblyzer, plot_embeddings
+from pathlib import Path
+
 import whisper
 import os
 import argparse
@@ -23,6 +25,13 @@ import torchaudio
 import numpy as np
 import requests
 import onnxruntime
+import json
+
+# Hide PyTorch + tokenizer + future deprecation warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 def download_silero_model():
     model_url = "https://models.silero.ai/models/vad/silero_vad.jit"
@@ -126,6 +135,27 @@ def convert_audio_to_wav(input_path):
         print(f"\n❌ Conversion error: {e}")
         return None
 
+def assign_speakers_to_segments(segments, diarized_segments):
+    """
+    Assigns speaker labels to Whisper segments by overlap.
+    """
+    labeled = []
+    for seg in segments:
+        seg_start, seg_end = seg['start'], seg['end']
+        # Default speaker if not matched
+        speaker = "Speaker ?"
+        for d_start, d_end, spk in diarized_segments:
+            if d_start <= seg_start <= d_end or d_start <= seg_end <= d_end:
+                speaker = f"Speaker {spk}"
+                break
+        labeled.append({
+            "start": seg_start,
+            "end": seg_end,
+            "speaker": speaker,
+            "text": seg['text'].strip()
+        })
+    return labeled
+
 def transcribe_audio(file_path, language=None, model_size="medium", enable_diarization=False, enable_monitoring=True):
     global monitoring, vad_model
 
@@ -149,7 +179,8 @@ def transcribe_audio(file_path, language=None, model_size="medium", enable_diari
 
     # Transcription with Whisper
     with torch.no_grad():
-        result = model.transcribe(wav_file, language=language)
+        result = model.transcribe(wav_file, language=language)        
+        segments = result["segments"]
 
     # Base transcript text with time stamps
     transcript_text = [
@@ -160,7 +191,59 @@ def transcribe_audio(file_path, language=None, model_size="medium", enable_diari
 
     # Stop monitoring
     monitoring = False
+    
+    # Assign speaker labels to segments
+    if enable_diarization:
+        print("🔹 Performing speaker diarization using Resemblyzer...")
 
+        if args.plot:
+            diarized_segments, embeds, labels = diarize_with_resemblyzer(
+                wav_file,
+                num_speakers=args.speakers,
+                return_plot_data=True
+            )
+            plot_path = Path(file_path).with_suffix(".png")
+            plot_embeddings(embeds, labels, out_path=plot_path, show=False)
+
+
+
+
+
+
+
+
+        # if args.plot:
+            # diarized_segments, embeds, labels = diarize_with_resemblyzer(
+                # wav_file,
+                # num_speakers=args.speakers,
+                # return_plot_data=True
+            # )
+            # plot_embeddings(embeds, labels)
+            # plot_path = Path(file_path).with_suffix(".png")
+            
+            
+            
+            #plot_embeddings(embeds, labels, out_path=plot_path, show=False)
+        else:
+            diarized_segments = diarize_with_resemblyzer(
+                wav_file,
+                num_speakers=args.speakers
+            )
+
+        final_segments = assign_speakers_to_segments(segments, diarized_segments)
+
+    else:
+        # No diarization: assign default speaker
+        final_segments = [
+            {
+                "start": seg['start'],
+                "end": seg['end'],
+                "speaker": "Speaker 0",
+                "text": seg['text'].strip()
+            }
+            for seg in segments
+        ]
+        
     # Diarization (Resemblyzer-based)
     if enable_diarization:
         print("\n🔹 Performing speaker diarization using Resemblyzer.")
@@ -177,21 +260,40 @@ def transcribe_audio(file_path, language=None, model_size="medium", enable_diari
         else:
             final_transcript += "\n\nDiarization failed or returned no segments.\n"
 
-    # Determine output file name based on forced language
+    base = Path(file_path)
+    base_output_path = base.with_suffix("")
+
     if language:
         lang_code = language.lower()
-        output_file = os.path.splitext(file_path)[0] + f"_{lang_code}.txt"
-    else:
-        output_file = os.path.splitext(file_path)[0] + ".txt"
+        base_output_path = base_output_path.with_name(base_output_path.name + f"_{lang_code}")
 
-    # Save transcript to file
+    # Save transcript as plain text
+    output_txt = base_output_path.with_suffix(".txt")
     try:
-        with open(output_file, "w", encoding="utf-8") as f:
+        with open(output_txt, "w", encoding="utf-8") as f:
             f.write(final_transcript)
         print(f"\n✅ Transcription complete.")
-        print(f"\n📄 Saved transcript to: {output_file}")
+        print(f"📄 Saved transcript to: {output_txt}")
     except Exception as e:
-        print(f"\n❌ Error writing transcript to file: {e}")
+        print(f"\n❌ Error writing transcript to text file: {e}")
+
+    # Save transcript as JSON
+    output_json = base_output_path.with_suffix(".json")
+    try:
+        with open(output_json, "w", encoding="utf-8") as jf:
+            json.dump(final_segments, jf, indent=2)
+        print(f"📄 Saved transcript JSON to: {output_json}")
+    except Exception as e:
+        print(f"\n❌ Error writing transcript to JSON: {e}")
+
+    # # Optionally: save a second JSON version with custom `_pl` suffix
+    # json_path_pl = base_output_path.with_name(base_output_path.name + "_pl").with_suffix(".json")
+    # try:
+        # with open(json_path_pl, "w", encoding="utf-8") as jf:
+            # json.dump(final_segments, jf, indent=2)
+        # print(f"📄 Saved alternate JSON to: {json_path_pl}")
+    # except Exception as e:
+        # print(f"\n❌ Error writing alternate JSON to: {e}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Transcribe audio with optional speaker separation and system monitoring.")
@@ -201,6 +303,7 @@ if __name__ == "__main__":
     parser.add_argument("--diarization", action="store_true", help="Enable speaker separation.")
     parser.add_argument("--no-monitor", action="store_true", help="Disable system resource monitoring.")
     parser.add_argument("--speakers", type=int, help="Estimated number of speakers for diarization.")
+    parser.add_argument("--plot", action="store_true", help="Visualize speaker embeddings after diarization.")
 
     args = parser.parse_args()
     transcribe_audio(args.file, args.language, args.model, args.diarization, not args.no_monitor)
