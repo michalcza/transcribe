@@ -161,3 +161,6 @@ cython_debug/
 *.m4a
 *.txt
 *.wav
+# keep /audio/ but nothing else inside
+/audio/**
+!.gitkeep
